@@ -864,7 +864,7 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
     rvfi_mem_wdata = new_rvfi_trace.m_mem.wdata;
 
     rvfi_dbg       = new_rvfi_trace.m_dbg_cause;
-    rvfi_dbg_mode  = new_rvfi_trace.m_dbg_taken;
+    rvfi_dbg_mode  = new_rvfi_trace.m_dbg_mode;
 
     rvfi_trap.trap = 0;
     if (new_rvfi_trace.m_is_illegal) begin
@@ -2000,6 +2000,8 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
         trace_if.m_insn = r_pipe_freeze_trace.instr_if;  //Instr comes from if, buffer for one cycle
         trace_if.m_pc_rdata = r_pipe_freeze_trace.pc_if;
         trace_if.m_dbg_taken = is_dbg_taken;
+        // Debug mode of the instruction, sampled as it enters ID.
+        trace_if.m_dbg_mode  = r_pipe_freeze_trace.debug_mode;
         trace_if.m_dbg_cause = saved_debug_cause;
         trace_if.m_is_ebreak = '0;
         trace_if.m_is_ecall = 1'b0;
