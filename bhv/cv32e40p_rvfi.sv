@@ -45,6 +45,7 @@ module cv32e40p_rvfi
 
     input logic       debug_mode_i,
     input logic [2:0] debug_cause_i,
+    input logic       debug_req_entry_i = 1'b0,
     //// INSTR IF Probes ////
     input logic       instr_req_i,
     input logic       instr_grant_i,
@@ -1540,6 +1541,20 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
           pc_mux_interrupt = 1'b1;
           s_is_irq_start   = 1'b1;
         end
+      end
+
+      // A trigger or a halt request kills the instruction in ID.
+      if ((r_pipe_freeze_trace.ctrl_fsm_cs == DBG_TAKEN_ID) &&
+          ((r_pipe_freeze_trace.debug_cause == DBG_CAUSE_TRIGGER) ||
+           r_pipe_freeze_trace.debug_req_entry) &&
+          !r_pipe_freeze_trace.debug_mode && trace_if.m_valid &&
+          (trace_if.m_pc_rdata == r_pipe_freeze_trace.pc_id)) begin
+        trace_if.m_valid = 1'b0;
+      end
+      // An interrupt kills it too.
+      if (pc_mux_interrupt && trace_if.m_valid &&
+          (trace_if.m_pc_rdata == r_pipe_freeze_trace.pc_id)) begin
+        trace_if.m_valid = 1'b0;
       end
 
       if (r_pipe_freeze_trace.ctrl_fsm_cs == DBG_TAKEN_ID && r_pipe_freeze_trace.ebrk_insn_dec) begin
