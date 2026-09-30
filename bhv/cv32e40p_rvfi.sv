@@ -1980,6 +1980,7 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
         trace_if.m_dbg_taken = is_dbg_taken;
         trace_if.m_dbg_cause = saved_debug_cause;
         trace_if.m_is_ebreak = '0;
+        trace_if.m_is_illegal = 1'b0;
         trace_if.m_trap = 1'b0;
 
         trace_if.m_valid = 1'b1;
