@@ -868,7 +868,9 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
     rvfi_mem_addr  = new_rvfi_trace.m_mem.addr;
     rvfi_mem_rmask = new_rvfi_trace.m_mem.rmask;
     rvfi_mem_wmask = new_rvfi_trace.m_mem.wmask;
-    rvfi_mem_rdata = new_rvfi_trace.m_mem.rdata;
+    // Load data: the WB write, the second destination of a post-increment load.
+    rvfi_mem_rdata = mem_data(new_rvfi_trace.m_rd_wdata[new_rvfi_trace.m_2_rd_insn],
+                              new_rvfi_trace.m_mem.rmask);
     rvfi_mem_wdata = new_rvfi_trace.m_mem.wdata;
 
     rvfi_dbg       = new_rvfi_trace.m_dbg_cause;
@@ -1469,15 +1471,20 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
     s_id_done             = 1'b0;
   endfunction
 
-  function logic [31:0] be_to_mask(logic [3:0] be);
-    logic [31:0] mask;
-    mask[7:0]   = (be[0] == 1'b1) ? 8'hFF : 8'h00;
-    mask[15:8]  = (be[1] == 1'b1) ? 8'hFF : 8'h00;
-    mask[23:16] = (be[2] == 1'b1) ? 8'hFF : 8'h00;
-    mask[31:24] = (be[3] == 1'b1) ? 8'hFF : 8'h00;
+  // RVFI masks: one bit per byte from rvfi_mem_addr (data_type 00 word, 01 halfword, 1x byte).
+  function logic [31:0] mem_mask(logic [1:0] data_type);
+    case (data_type)
+      2'b00:   return 32'h0000_000F;
+      2'b01:   return 32'h0000_0003;
+      default: return 32'h0000_0001;
+    endcase
+  endfunction
 
-    be_to_mask  = mask;
-    return mask;
+  function logic [31:0] mem_data(logic [31:0] data, logic [31:0] mask);
+    for (int i = 0; i < 4; i++) begin
+      if (!mask[i]) data[8*i+:8] = 8'h00;
+    end
+    return data;
   endfunction
 
   function void commit_rf_to_trace(insn_trace_t m_trace);
@@ -1902,9 +1909,10 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
 
             if (!r_pipe_freeze_trace.data_we_ex) begin
               trace_id.m_is_load   = 1'b1;
-              trace_id.m_mem.wmask = be_to_mask(r_pipe_freeze_trace.lsu_data_be);  //'1;
+              trace_id.m_mem.rmask = mem_mask(r_pipe_freeze_trace.data_type_ex);
             end else begin
-              trace_id.m_mem.rmask = be_to_mask(r_pipe_freeze_trace.lsu_data_be);  //'1;
+              trace_id.m_mem.wmask = mem_mask(r_pipe_freeze_trace.data_type_ex);
+              trace_id.m_mem.wdata = mem_data(r_pipe_freeze_trace.alu_operand_c_ex, trace_id.m_mem.wmask);
             end
 
             if (trace_id.m_got_ex_reg) begin  // Shift index 0 to 1
@@ -1966,7 +1974,11 @@ insn_trace_t trace_if, trace_id, trace_ex, trace_ex_next, trace_wb;
               trace_id.m_mem_req_id[0] = cnt_data_req;
             end
             if (!r_pipe_freeze_trace.data_we_ex) begin
-              trace_id.m_is_load = 1'b1;
+              trace_id.m_is_load   = 1'b1;
+              trace_id.m_mem.rmask = mem_mask(r_pipe_freeze_trace.data_type_ex);
+            end else begin
+              trace_id.m_mem.wmask = mem_mask(r_pipe_freeze_trace.data_type_ex);
+              trace_id.m_mem.wdata = mem_data(r_pipe_freeze_trace.alu_operand_c_ex, trace_id.m_mem.wmask);
             end
             if (trace_id.m_got_ex_reg) begin  // Shift index 0 to 1
               trace_id.m_mem_req_id[1] = trace_id.m_mem_req_id[0];
