@@ -1209,10 +1209,10 @@ module cv32e40p_cs_registers
       mtvec_q <= '0;
       mtvec_mode_q <= MTVEC_MODE;
     end else begin
-      // update CSRs
+      // update CSRs, each group only when its _n can differ from its _q (clock gating)
       if (FPU == 1) begin
-        frm_q    <= frm_n;
-        fflags_q <= fflags_n;
+        if (csr_we_int) frm_q <= frm_n;
+        if (csr_we_int || fflags_we_i) fflags_q <= fflags_n;
         if (ZFINX == 0) begin
           mstatus_fs_q <= mstatus_fs_n;
         end
@@ -1229,16 +1229,22 @@ module cv32e40p_cs_registers
             mprv: 1'b0
         };
       end
-      mepc_q       <= mepc_n;
-      mcause_q     <= mcause_n;
-      depc_q       <= depc_n;
-      dcsr_q       <= dcsr_n;
-      dscratch0_q  <= dscratch0_n;
-      dscratch1_q  <= dscratch1_n;
-      mscratch_q   <= mscratch_n;
-      mie_q        <= mie_n;
-      mtvec_q      <= mtvec_n;
-      mtvec_mode_q <= mtvec_mode_n;
+      if (csr_we_int || csr_save_cause_i) begin
+        mepc_q   <= mepc_n;
+        mcause_q <= mcause_n;
+        depc_q   <= depc_n;
+        dcsr_q   <= dcsr_n;
+      end
+      if (csr_we_int) begin
+        dscratch0_q <= dscratch0_n;
+        dscratch1_q <= dscratch1_n;
+        mscratch_q  <= mscratch_n;
+        mie_q       <= mie_n;
+      end
+      if (csr_we_int || csr_mtvec_init_i) begin
+        mtvec_q      <= mtvec_n;
+        mtvec_mode_q <= mtvec_mode_n;
+      end
     end
   end
   ////////////////////////////////////////////////////////////////////////
@@ -1494,7 +1500,7 @@ module cv32e40p_cs_registers
         end
         always_ff @(posedge clk, negedge rst_n)
           if (!rst_n) mhpmevent_q[evt_gidx][NUM_HPM_EVENTS-1:0] <= 'b0;
-          else
+          else if (mhpmevent_we)
             mhpmevent_q[evt_gidx][NUM_HPM_EVENTS-1:0] <= mhpmevent_n[evt_gidx][NUM_HPM_EVENTS-1:0];
       end
     end
@@ -1527,7 +1533,7 @@ module cv32e40p_cs_registers
       end else begin : gen_implemented
         always_ff @(posedge clk, negedge rst_n)
           if (!rst_n) mcountinhibit_q[inh_gidx] <= 'b1;  // default disable
-          else mcountinhibit_q[inh_gidx] <= mcountinhibit_n[inh_gidx];
+          else if (mcountinhibit_we) mcountinhibit_q[inh_gidx] <= mcountinhibit_n[inh_gidx];
       end
     end
   endgenerate
